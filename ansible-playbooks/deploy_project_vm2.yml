@@ -1,0 +1,16 @@
+---
+- name: Clone GitHub Project on VM2
+  hosts: webservers
+  become: yes
+
+  tasks:
+    - name: Install git
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Clone the repository
+      git:
+        repo: 'https://github.com/Jawad12wq/Jawad-Portfolio-website.git'
+        dest: /var/www/html/index.html

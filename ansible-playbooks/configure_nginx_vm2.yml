@@ -1,0 +1,59 @@
+---
+- name: Setup NGINX as HTTPS reverse proxy on VM2
+  hosts: webservers
+  become: yes
+
+  tasks:
+    - name: Install nginx and openssl
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - nginx
+        - openssl
+
+    - name: Create self-signed SSL certificate
+      command: >
+        openssl req -x509 -nodes -days 365
+        -newkey rsa:2048
+        -keyout /etc/ssl/private/nginx-selfsigned.key
+        -out /etc/ssl/certs/nginx-selfsigned.crt
+        -subj "/C=PK/ST=KPK/L=Peshawar/O=Jawad/CN=localhost"
+      args:
+        creates: /etc/ssl/private/nginx-selfsigned.key
+
+    - name: Configure NGINX reverse proxy
+      copy:
+        dest: /etc/nginx/sites-available/sample_project
+        content: |
+          server {
+              listen 443 ssl;
+              server_name localhost;
+
+              ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+              ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+
+              location / {
+                  proxy_pass http://127.0.0.1:8090;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+
+    - name: Enable the new NGINX site
+      file:
+        src: /etc/nginx/sites-available/sample_project
+        dest: /etc/nginx/sites-enabled/sample_project
+        state: link
+        force: yes
+
+    - name: Remove default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Restart NGINX
+      service:
+        name: nginx
+        state: restarted
